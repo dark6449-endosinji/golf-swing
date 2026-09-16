@@ -41,6 +41,17 @@ async function reloadRecords(){
   records = await fetchRecords();
 }
 
+/* ---------- 마지막으로 로그인한 이메일 ----------
+   세션과는 별개입니다. 세션이 살아 있으면 로그인 화면 자체가 안 뜨고,
+   브라우저를 정리했거나 다른 기기일 때 주소를 다시 치지 않게 해 줍니다. */
+var LAST_EMAIL_KEY = 'golf-swing-last-email';
+function lastEmail(){
+  try{ return window.localStorage.getItem(LAST_EMAIL_KEY) || ''; }catch(e){ return ''; }
+}
+function rememberEmail(v){
+  try{ window.localStorage.setItem(LAST_EMAIL_KEY, v); }catch(e){ /* 무시 */ }
+}
+
 /* ---------- toast ---------- */
 var toastTimer = null;
 function toast(msg, kind){
@@ -649,7 +660,7 @@ document.addEventListener('click', function(e){
   else if(a==='clearAll'){ openClearConfirm(); }
   else if(a==='confirmClear'){ doClearAll(); }
   else if(a==='signOut'){ doSignOut(); }
-  else if(a==='backToLogin'){ showLogin(''); }
+  else if(a==='backToLogin'){ showLogin(lastEmail()); }
   else if(a==='retryBoot'){ boot(); }
 });
 
@@ -690,9 +701,12 @@ function showLogin(email, msg, kind){
       '<button class="save" type="submit" id="login-btn">로그인 링크 받기</button>'+
     '</form>'+
     (msg?'<p class="data-msg '+(kind||'err')+'">'+esc(msg)+'</p>':'')+
-    '<p class="gate-note">기록은 계정에 저장돼요. 휴대폰에서 적은 게 PC에서도 그대로 보입니다.</p>'
+    '<p class="gate-note">한 번 로그인하면 이 브라우저에서는 계속 유지돼요. 기록은 계정에 저장돼서 휴대폰에서 적은 게 PC에서도 그대로 보입니다.</p>'
   );
-  var el=document.getElementById('login-email'); if(el) el.focus();
+  // 주소가 이미 채워져 있으면 포커스를 주지 않습니다.
+  // 모바일에서 불필요하게 키보드가 올라오는 걸 막기 위해서입니다.
+  var el=document.getElementById('login-email');
+  if(el && !el.value) el.focus();
 }
 function showLinkSent(email){
   showGate(
@@ -722,6 +736,7 @@ async function requestMagicLink(){
   if(btn){ btn.disabled=true; btn.textContent='보내는 중…'; }
   try{
     await sendMagicLink(email);
+    rememberEmail(email);
     showLinkSent(email);
   }catch(e){
     showLogin(email, errMsg(e), 'err');
@@ -731,7 +746,7 @@ async function requestMagicLink(){
 async function doSignOut(){
   try{ await signOut(); }catch(e){ /* 세션이 이미 없으면 그대로 진행 */ }
   enteredFor=null; records=[]; state.view='calendar';
-  showLogin('');
+  showLogin(lastEmail());
 }
 
 /* 로그인 링크가 만료됐을 때 Supabase가 주소에 남기는 오류를 사람 말로 바꿉니다. */
@@ -787,11 +802,11 @@ async function boot(){
 
   onAuthChange(function(next){
     if(next) enterApp();
-    else { enteredFor=null; records=[]; showLogin(''); }
+    else { enteredFor=null; records=[]; showLogin(lastEmail()); }
   });
 
   if(session) await enterApp();
-  else showLogin('', linkErr, 'err');
+  else showLogin(lastEmail(), linkErr, linkErr?'err':'');
 }
 
 boot();
