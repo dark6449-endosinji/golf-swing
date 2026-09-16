@@ -814,8 +814,8 @@ function showGateError(msg){
 async function requestMagicLink(){
   var inp=document.getElementById('login-email'), btn=document.getElementById('login-btn');
   var email=inp?inp.value.trim():'';
-  if(!email || email.indexOf('@')<1 || email.indexOf('.')<0){
-    showLogin(email,'이메일 주소를 다시 확인해 주세요.','err'); return;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    showLogin(email,'이메일 형식이 올바르지 않습니다. (예: name@example.com)','err'); return;
   }
   if(btn){ btn.disabled=true; btn.textContent='보내는 중…'; }
   try{

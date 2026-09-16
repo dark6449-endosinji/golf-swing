@@ -218,14 +218,29 @@ function dbError(error, fallback) {
 
 function authError(error) {
   const msg = String((error && error.message) || '');
-  if (/Failed to fetch|NetworkError|fetch failed|network/i.test(msg)) {
-    return new StoreError('서버에 연결하지 못했습니다. 인터넷 연결과 Supabase 주소 설정을 확인해 주세요.', 'OFFLINE');
+  const status = error && error.status;
+  const tail = ' (' + (msg || '원인 미상') + (status ? ' / HTTP ' + status : '') + ')';
+
+  if (/Failed to fetch|NetworkError|fetch failed/i.test(msg)) {
+    return new StoreError('서버에 연결하지 못했습니다. 인터넷 연결과 Supabase 주소 설정을 확인해 주세요.' + tail, 'OFFLINE');
   }
-  if (/rate limit|too many|for security purposes/i.test(msg)) {
-    return new StoreError('메일을 너무 자주 요청했습니다. 잠시 뒤에 다시 시도해 주세요.', 'RATE_LIMIT');
+  if (status === 429 || /rate limit|too many requests|for security purposes|after \d+ seconds/i.test(msg)) {
+    return new StoreError('메일을 너무 자주 요청했습니다. 잠시 뒤에 다시 시도해 주세요.' + tail, 'RATE_LIMIT');
   }
-  if (/invalid|email/i.test(msg)) {
-    return new StoreError('이메일 주소를 다시 확인해 주세요.', 'BAD_EMAIL');
+  if (/signups? (not allowed|disabled)|signup is disabled/i.test(msg)) {
+    return new StoreError(
+      '이 Supabase 프로젝트에서 신규 가입이 꺼져 있습니다. Authentication → Sign In / Providers 에서 "Allow new users to sign up"을 켜 주세요.' + tail,
+      'SIGNUP_DISABLED'
+    );
   }
-  return new StoreError('로그인 메일을 보내지 못했습니다. (' + msg + ')', 'AUTH');
+  if (/error sending|smtp|confirmation email|failed to send/i.test(msg)) {
+    return new StoreError(
+      'Supabase가 메일을 보내지 못했습니다. 무료 플랜 발송 한도이거나 SMTP 설정 문제일 수 있습니다.' + tail,
+      'SMTP'
+    );
+  }
+  if (/invalid[_ ]?email|email[_ ]?address[_ ]?invalid|email.*not.*(valid|allowed)/i.test(msg)) {
+    return new StoreError('이메일 주소를 Supabase가 거부했습니다.' + tail, 'BAD_EMAIL');
+  }
+  return new StoreError('로그인 메일을 보내지 못했습니다.' + tail, 'AUTH');
 }
