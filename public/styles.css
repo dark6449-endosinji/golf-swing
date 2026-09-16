@@ -282,6 +282,5 @@ body.noscroll{overflow:hidden;}
   letter-spacing:.32em;text-indent:.32em;color:var(--ink);background:var(--card);
   outline:none;margin-bottom:12px;text-align:center;
   -webkit-appearance:none;appearance:none;}
-#login-code::placeholder{color:#C4CCC6;font-weight:600;letter-spacing:.32em;}
 #login-code:focus{border-color:var(--turf);box-shadow:0 0 0 3px rgba(11,110,79,.12);}
 #login-code:disabled{opacity:.6;}

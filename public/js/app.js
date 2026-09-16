@@ -697,7 +697,7 @@ function showLogin(email, msg, kind){
     '<div class="gate-emo">⛳</div>'+
     '<div class="eyebrow">SWING LOG</div>'+
     '<h1>골프 스윙 기록</h1>'+
-    '<p class="gate-lead">이메일 주소를 넣으면 6자리 로그인 코드를 보내드려요. 비밀번호는 없습니다.</p>'+
+    '<p class="gate-lead">이메일 주소를 넣으면 로그인 코드를 보내드려요. 비밀번호는 없습니다.</p>'+
     '<form id="login-form" novalidate>'+
       '<input id="login-email" type="email" inputmode="email" autocomplete="email" '+
         'placeholder="you@example.com" value="'+esc(email||'')+'">'+
@@ -711,29 +711,38 @@ function showLogin(email, msg, kind){
   var el=document.getElementById('login-email');
   if(el && !el.value) el.focus();
 }
+/* 코드 길이는 Supabase 프로젝트 설정(6~10)에 따라 다릅니다.
+   요즘 새로 만든 프로젝트는 8자리가 기본이라, 특정 길이를 가정하지 않고
+   범위로만 받습니다. */
+var CODE_MIN = 6, CODE_MAX = 10;
+
 function showCodeEntry(email, msg){
   showGate(
     '<div class="gate-emo">📬</div>'+
     '<h1>코드를 입력해 주세요</h1>'+
-    '<p class="gate-lead"><strong>'+esc(email)+'</strong> 으로 6자리 코드를 보냈어요.<br>'+
+    '<p class="gate-lead"><strong>'+esc(email)+'</strong> 으로 로그인 코드를 보냈어요.<br>'+
       '메일에 적힌 숫자를 그대로 옮겨 적으면 됩니다.</p>'+
     '<form id="code-form" novalidate>'+
       '<input id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" '+
-        'maxlength="6" placeholder="000000">'+
+        'maxlength="'+CODE_MAX+'">'+
       '<button class="save" type="submit" id="code-btn">로그인</button>'+
     '</form>'+
     (msg?'<p class="data-msg err">'+esc(msg)+'</p>':'')+
     '<button class="btn-ghost" style="width:100%;margin-top:10px;" data-action="backToLogin">다른 주소로 받기</button>'+
-    '<p class="gate-note">메일이 안 보이면 스팸함도 확인해 주세요. 코드는 한 시간 안에 입력해야 합니다.</p>'
+    '<p class="gate-note">메일이 안 보이면 스팸함도 확인해 주세요. 시간이 지나면 만료되니 받은 뒤 바로 입력해 주세요.</p>'
   );
   var el=document.getElementById('login-code');
   if(el){
     el.focus();
-    // 숫자만 남기고, 6자리가 채워지면 바로 확인합니다 (붙여넣기 한 번으로 끝).
+    var prev=0;
     el.addEventListener('input', function(){
-      var v=el.value.replace(/\D/g,'').slice(0,6);
+      var v=el.value.replace(/\D/g,'').slice(0,CODE_MAX);
       if(v!==el.value) el.value=v;
-      if(v.length===6) submitLoginCode();
+      // 붙여넣기나 자동완성처럼 여러 자리가 한 번에 들어오면 곧바로 확인합니다.
+      // 한 글자씩 치는 중에는 코드가 몇 자리인지 알 수 없으므로 기다립니다.
+      var pasted = (v.length - prev) >= 2;
+      prev = v.length;
+      if(pasted && v.length>=CODE_MIN) submitLoginCode();
     });
   }
 }
@@ -766,7 +775,9 @@ async function requestLoginCode(){
 async function submitLoginCode(){
   var inp=document.getElementById('login-code'), btn=document.getElementById('code-btn');
   var code=(inp?inp.value:'').replace(/\D/g,'');
-  if(code.length!==6){ showCodeEntry(pendingEmail,'숫자 6자리를 입력해 주세요.'); return; }
+  if(code.length<CODE_MIN || code.length>CODE_MAX){
+    showCodeEntry(pendingEmail,'메일에 적힌 숫자를 빠짐없이 입력해 주세요.'); return;
+  }
   if(btn){ btn.disabled=true; btn.textContent='확인 중…'; }
   if(inp) inp.disabled=true;
   try{
