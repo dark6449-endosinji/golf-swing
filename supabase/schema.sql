@@ -11,9 +11,10 @@ create table if not exists public.swings (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users (id) on delete cascade,
 
-  -- 기록마다 붙는 고유 표식. 기기(localStorage)에서 옮겨온 기록은
-  -- 원래 id를 그대로 씁니다. 그래서 같은 코드를 두 번 가져와도
-  -- 새 행이 생기지 않고 조용히 무시됩니다.
+  -- 예전 localStorage 기록을 옮겨오던 시절, 같은 기록을 두 번 넣어도
+  -- 중복되지 않게 하려고 둔 표식입니다. 이전이 끝나 앱은 더 이상 쓰지 않지만,
+  -- 나중에 대량 가져오기를 다시 붙일 때를 대비해 남겨 둡니다.
+  -- 정말 필요 없으면:  alter table public.swings drop column client_id;
   client_id   text not null default gen_random_uuid()::text,
 
   played_on   date         not null,

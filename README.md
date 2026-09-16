@@ -20,7 +20,6 @@ public/              Vercel이 그대로 서빙하는 정적 파일
 api/config.js        Vercel 서버리스 함수. 환경변수의 Supabase 공개 설정을 내려줌
 supabase/schema.sql  테이블 + 인덱스 + RLS 정책
 vercel.json          정적 루트(public) / 보안 헤더
-legacy/              localStorage만 쓰던 예전 단일 파일 버전 (참고용, 지워도 됨)
 ```
 
 ---
@@ -96,16 +95,6 @@ git push -u origin main
 
 ---
 
-## 기존 기록은 어떻게 되나요
-
-예전 버전을 쓰던 기기에서 **처음 로그인할 때, 그 기기의 localStorage 기록이 자동으로 계정에 올라갑니다.**
-원본은 지우지 않으니 잘못돼도 잃을 게 없습니다. 같은 계정으로 다시 로그인해도 두 번 올라가지 않습니다.
-
-다른 기기에 남은 기록은 **데이터 관리 → 코드로 가져오기** 에 예전 백업 코드를 붙여넣으면 합쳐집니다.
-같은 코드를 여러 번 넣어도 중복되지 않습니다.
-
----
-
 ## 로컬에서 실행
 
 ```bash
@@ -140,7 +129,6 @@ export default {
 
 ## 남은 것
 
-- `legacy/index-localStorage.html` — 예전 단일 파일 버전. 필요 없으면 지우세요.
 - `.netlify/`, `node_modules/` — 이제 안 쓰는 Netlify 흔적과 예전 의존성. 지워도 됩니다.
 - `AX/vibe/inventory/` — 골프와 무관한 다른 프로젝트라 `.gitignore`에 넣어 뒀습니다. 따로 옮기는 걸 권합니다.
 - `KakaoTalk_*.jpg` — 공개 저장소에 올라가지 않도록 기본 제외해 뒀습니다. 같이 올리려면 `.gitignore`에서 빼세요.

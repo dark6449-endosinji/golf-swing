@@ -11,9 +11,6 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { loadConfig } from './config.js';
 
-const LEGACY_KEY = 'golf-swing-records';   // 예전 버전이 쓰던 localStorage 키
-const MIGRATED_KEY = 'golf-swing-migrated:';
-
 let sb = null;
 let session = null;
 
@@ -97,79 +94,6 @@ export async function removeRecord(id) {
 export async function removeAllRecords() {
   const { error } = await sb.from('swings').delete().eq('user_id', requireUserId());
   if (error) throw dbError(error, '삭제하지 못했습니다.');
-}
-
-/* 여러 건을 한꺼번에 넣습니다. client_id가 겹치면 조용히 건너뜁니다.
-   → 같은 백업 코드를 두 번 가져와도 기록이 불어나지 않습니다. */
-export async function importRecords(list) {
-  const userId = requireUserId();
-  const rows = list.map((r) => ({
-    user_id: userId,
-    client_id: String(r.id),
-    played_on: r.date,
-    club: r.club,
-    ball_speed: r.ball,
-    head_speed: r.head,
-    distance: r.dist,
-    created_at: new Date(r.createdAt || Date.now()).toISOString(),
-  }));
-
-  let added = 0;
-  for (let i = 0; i < rows.length; i += 500) {
-    const chunk = rows.slice(i, i + 500);
-    const { data, error } = await sb
-      .from('swings')
-      .upsert(chunk, { onConflict: 'user_id,client_id', ignoreDuplicates: true })
-      .select('id');
-    if (error) throw dbError(error, '가져오지 못했습니다.');
-    added += (data || []).length;
-  }
-  return added;
-}
-
-/* ---------- 예전 기기 기록(localStorage) 자동 이전 ---------- */
-/* 로그인한 뒤 한 번만 돕니다. 성공해도 원본은 지우지 않습니다(안전망). */
-export async function migrateLegacyRecords() {
-  const userId = requireUserId();
-  const flag = MIGRATED_KEY + userId;
-
-  let legacy = [];
-  try {
-    if (window.localStorage.getItem(flag)) return 0;
-    const raw = window.localStorage.getItem(LEGACY_KEY);
-    if (!raw) return 0;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) legacy = parsed;
-  } catch (e) {
-    return 0;   // localStorage를 못 읽는 환경이면 조용히 넘어감
-  }
-
-  const clean = legacy.filter(
-    (r) => r && r.date && r.club && isFinite(+r.ball) && isFinite(+r.head) && isFinite(+r.dist)
-  );
-  if (!clean.length) {
-    markMigrated(flag);
-    return 0;
-  }
-
-  const added = await importRecords(clean);
-  markMigrated(flag);
-  return added;
-}
-
-export function hasLegacyRecords() {
-  try {
-    const raw = window.localStorage.getItem(LEGACY_KEY);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0;
-  } catch (e) {
-    return false;
-  }
-}
-
-function markMigrated(flag) {
-  try { window.localStorage.setItem(flag, String(Date.now())); } catch (e) { /* 무시 */ }
 }
 
 /* ---------- 변환 & 에러 ---------- */

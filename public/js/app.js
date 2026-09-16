@@ -1,7 +1,6 @@
 import {
   initStore, onAuthChange, currentUser, sendMagicLink, signOut,
-  fetchRecords, addRecord, removeRecord, removeAllRecords, importRecords,
-  migrateLegacyRecords, hasLegacyRecords,
+  fetchRecords, addRecord, removeRecord, removeAllRecords,
 } from './store.js';
 
 /* ---------- constants & state ---------- */
@@ -23,7 +22,6 @@ function todayStr(){return ymd(new Date());}
 function parseYmd(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
 function longDate(s){var d=parseYmd(s);return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+WD[d.getDay()]+')';}
 function clubRank(c){var i=CLUB_ORDER.indexOf(c);return i<0?999:i;}
-function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function fmtNum(n){if(n==null||isNaN(n))return '—';return Number.isInteger(n)?String(n):String(+n.toFixed(1));}
 function fmt1(n){return (n==null||isNaN(n))?'—':(+n).toFixed(1);}
 function fmt2(n){return (n==null||isNaN(n))?'—':(+n).toFixed(2);}
@@ -63,7 +61,7 @@ function renderTopbar(){
   }
   if(state.view==='data'){
     return '<div class="tb-sub"><button class="back" data-action="back" aria-label="뒤로">‹</button>'+
-      '<div class="t"><div class="h">데이터 관리</div><div class="s">계정 · 백업</div></div></div>';
+      '<div class="t"><div class="h">데이터 관리</div><div class="s">계정</div></div></div>';
   }
   if(state.view==='clubs'){
     var ds=state.selectedDate, cnt=records.filter(function(r){return r.date===ds;}).length;
@@ -185,9 +183,6 @@ function dataView(){
   var days={}; records.forEach(function(r){ days[r.date]=1; });
   var dayCount=Object.keys(days).length;
   var u=currentUser();
-  var legacyNote = hasLegacyRecords()
-    ? '<p class="data-note">이 기기에 남아 있던 예전 기록은 로그인할 때 계정으로 옮겨졌어요. 원본은 그대로 두었으니 안심하셔도 됩니다.</p>'
-    : '';
   return ''+
     '<div class="data-card account">'+
       '<h3>로그인 계정</h3>'+
@@ -196,21 +191,6 @@ function dataView(){
       '<button class="btn-line" data-action="signOut">로그아웃</button>'+
     '</div>'+
     '<div class="count-line">저장된 기록 '+n+'개 · 연습일 '+dayCount+'일</div>'+
-    legacyNote+
-    '<div class="data-card">'+
-      '<h3>백업 코드 만들기</h3>'+
-      '<p>기록 전체를 코드 한 줄로 받아 따로 보관해 둘 수 있어요. 이제는 계정에 저장되니 평소엔 필요 없고, 전체 삭제 전이나 다른 계정으로 옮길 때만 쓰세요.</p>'+
-      '<button class="btn-primary" data-action="exportData">코드 만들어 공유 / 복사</button>'+
-      '<textarea id="export-out" readonly placeholder="여기에 백업 코드가 표시됩니다." style="margin-top:10px;"></textarea>'+
-      '<div id="export-msg" class="data-msg"></div>'+
-    '</div>'+
-    '<div class="data-card">'+
-      '<h3>코드로 가져오기</h3>'+
-      '<p>예전 버전을 쓰던 다른 기기의 코드나 백업해 둔 코드를 붙여넣으면 지금 계정에 합쳐집니다. 같은 코드를 여러 번 넣어도 중복되지 않아요.</p>'+
-      '<textarea id="import-in" placeholder="내보내기로 만든 코드를 여기에 붙여넣으세요."></textarea>'+
-      '<button class="btn-line" data-action="importData">가져오기</button>'+
-      '<div id="import-msg" class="data-msg"></div>'+
-    '</div>'+
     '<div class="data-card">'+
       '<h3>사진으로 입력 <span class="ex-badge">예시 데이터</span></h3>'+
       '<p>사진 속 계기판 숫자를 자동으로 읽어 볼스피드·헤드스피드·거리를 채우는 기능이에요. 다음 차시에 제공될 예정이며, 아래는 완성 화면을 보여주는 예시입니다.</p>'+
@@ -218,7 +198,7 @@ function dataView(){
     '</div>'+
     '<div class="data-card danger">'+
       '<h3>전체 기록 삭제</h3>'+
-      '<p>이 계정에 저장된 모든 연습 기록을 서버에서 지웁니다. 되돌릴 수 없으니, 필요하면 먼저 백업 코드를 만들어 두세요.</p>'+
+      '<p>이 계정에 저장된 모든 연습 기록을 서버에서 지웁니다. 되돌릴 수 없습니다.</p>'+
       '<button class="btn-danger" style="width:100%;" data-action="clearAll">전체 기록 삭제</button>'+
     '</div>';
 }
@@ -359,86 +339,10 @@ function finishAdd(){
   render();
 }
 
-/* ---------- backup: export / import / clear ---------- */
-function encodeBackup(){
-  var payload=JSON.stringify({app:'gsl',v:1,records:records});
-  return 'GSL1:'+btoa(unescape(encodeURIComponent(payload)));
-}
-function decodeBackup(code){
-  var s=String(code).trim().replace(/\s+/g,'');
-  if(s.indexOf('GSL1:')!==0) return {ok:false,err:'코드 형식이 올바르지 않아요. "GSL1:"로 시작하는 코드 전체를 붙여넣어 주세요.'};
-  try{
-    var json=decodeURIComponent(escape(atob(s.slice(5))));
-    var obj=JSON.parse(json);
-    var recs=Array.isArray(obj)?obj:(obj&&obj.records);
-    if(!Array.isArray(recs)) return {ok:false,err:'코드에서 기록을 찾지 못했어요. 내보내기로 만든 코드인지 확인해 주세요.'};
-    var clean=recs.filter(function(r){ return r&&r.date&&r.club&&isFinite(+r.ball)&&isFinite(+r.head)&&isFinite(+r.dist); })
-      .map(function(r){ return {id:r.id||uid(),date:String(r.date),club:String(r.club),
-        ball:+r.ball,head:+r.head,dist:+r.dist,createdAt:r.createdAt||Date.now()}; });
-    return {ok:true,records:clean};
-  }catch(e){ return {ok:false,err:'코드를 해석할 수 없어요. 전체 코드를 다시 복사해 붙여넣어 주세요.'}; }
-}
-function fallbackCopy(text){
-  try{
-    var out=document.getElementById('export-out');
-    if(out){ out.focus(); out.select(); if(out.setSelectionRange) out.setSelectionRange(0,text.length); }
-    return !!(document.execCommand&&document.execCommand('copy'));
-  }catch(e){ return false; }
-}
-function copyText(text,msg,okText){
-  function done(ok){ if(!msg) return;
-    if(ok){ msg.className='data-msg ok'; msg.textContent=okText; }
-    else { msg.className='data-msg err'; msg.textContent='자동 복사가 안 됐어요. 위 코드 칸을 길게 눌러 전체 선택한 뒤 복사해 주세요.'; } }
-  try{
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).then(function(){done(true);},function(){done(fallbackCopy(text));});
-    }else{ done(fallbackCopy(text)); }
-  }catch(e){ done(fallbackCopy(text)); }
-}
-function exportData(){
-  var msg=document.getElementById('export-msg'), out=document.getElementById('export-out');
-  if(!records.length){ if(msg){msg.className='data-msg err'; msg.textContent='내보낼 기록이 없어요. 먼저 스윙 기록을 추가해 주세요.';} return; }
-  var code=encodeBackup();
-  if(out) out.value=code;
-  if(navigator.share){
-    navigator.share({title:'골프 스윙 기록',text:code}).then(function(){
-      if(msg){msg.className='data-msg ok'; msg.textContent='공유 창을 열었어요. 다른 기기로 코드를 보낸 뒤 "가져오기"에 붙여넣으세요.';}
-    }).catch(function(){ copyText(code,msg,'공유를 닫아서 코드를 복사했어요. 다른 기기의 "가져오기"에 붙여넣으세요.'); });
-  }else{
-    copyText(code,msg,'이 기기는 공유를 지원하지 않아 코드를 복사했어요. 다른 기기의 "가져오기"에 붙여넣으세요.');
-  }
-}
-async function importData(){
-  var msg=document.getElementById('import-msg'), inp=document.getElementById('import-in');
-  var raw=inp?inp.value:'';
-  if(!raw||!raw.trim()){ if(msg){msg.className='data-msg err'; msg.textContent='코드가 비어 있어요. 다른 기기의 "내보내기"에서 만든 코드를 붙여넣어 주세요.';} return; }
-  var res=decodeBackup(raw);
-  if(!res.ok){ if(msg){msg.className='data-msg err'; msg.textContent=res.err;} return; }
-
-  var btn=document.querySelector('[data-action="importData"]');
-  if(btn){ btn.disabled=true; btn.textContent='가져오는 중…'; }
-  var added=0;
-  try{
-    added=await importRecords(res.records);
-    await reloadRecords();
-  }catch(e){
-    var me=document.getElementById('import-msg');
-    if(me){ me.className='data-msg err'; me.textContent=errMsg(e); }
-    return;
-  }finally{
-    var b2=document.querySelector('[data-action="importData"]');
-    if(b2){ b2.disabled=false; b2.textContent='가져오기'; }
-  }
-
-  render();   // 가져온 것까지 포함해 개수를 다시 그립니다
-  var mo=document.getElementById('import-msg');
-  if(mo){ mo.className='data-msg ok';
-    mo.textContent = added>0 ? (added+'개를 계정에 추가했어요. 이제 총 '+records.length+'개 기록이 있어요.')
-                             : '새로 가져올 기록이 없어요. 이미 모두 저장되어 있어요.'; }
-}
+/* ---------- 전체 삭제 ---------- */
 function openClearConfirm(){
   var html='<div class="sheet confirm" role="dialog" aria-label="전체 삭제">'+
-    '<h2>모든 기록을 삭제할까요?</h2><p class="sub">이 기기의 연습 기록 '+records.length+'개가 모두 삭제돼요. 되돌릴 수 없어요.</p>'+
+    '<h2>모든 기록을 삭제할까요?</h2><p class="sub">이 계정의 연습 기록 '+records.length+'개가 모두 삭제돼요. 되돌릴 수 없어요.</p>'+
     '<div class="grid2"><button class="btn-ghost" data-action="cancelDel">취소</button>'+
     '<button class="btn-danger" data-action="confirmClear">전체 삭제</button></div></div>';
   var ov=document.getElementById('overlay');
@@ -741,8 +645,6 @@ document.addEventListener('click', function(e){
   else if(a==='confirmDel'){ doDelete(); }
   else if(a==='cancelDel'){ closeOverlay(); }
   else if(a==='openData'){ state.view='data'; render(); }
-  else if(a==='exportData'){ exportData(); }
-  else if(a==='importData'){ importData(); }
   else if(a==='openImageDemo'){ openImageDemo(); }
   else if(a==='clearAll'){ openClearConfirm(); }
   else if(a==='confirmClear'){ doClearAll(); }
@@ -857,9 +759,7 @@ async function enterApp(){
   }
 
   showBusy('기록 불러오는 중…');
-  var moved=0;
   try{
-    moved=await migrateLegacyRecords();
     await reloadRecords();
   }catch(e){
     enteredFor=null;
@@ -870,7 +770,6 @@ async function enterApp(){
   var t=new Date();
   state.y=t.getFullYear(); state.m=t.getMonth(); state.selectedDate=todayStr();
   hideGate(); render();
-  if(moved>0) toast('이 기기에 있던 기록 '+moved+'개를 계정으로 옮겼어요.');
 }
 
 async function boot(){
