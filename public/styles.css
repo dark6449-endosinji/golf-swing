@@ -275,3 +275,13 @@ body.noscroll{overflow:hidden;}
 .toast.err{background:var(--red);}
 @keyframes toastin{from{opacity:0;transform:translateX(-50%) translateY(8px);}
   to{opacity:1;transform:translateX(-50%) translateY(0);}}
+
+/* 로그인 코드 입력 — 메일의 숫자와 한눈에 대조되도록 크게 */
+#login-code{width:100%;height:62px;border:1.5px solid var(--line);border-radius:12px;
+  padding:0 8px;font-family:var(--font-data);font-size:28px;font-weight:700;
+  letter-spacing:.32em;text-indent:.32em;color:var(--ink);background:var(--card);
+  outline:none;margin-bottom:12px;text-align:center;
+  -webkit-appearance:none;appearance:none;}
+#login-code::placeholder{color:#C4CCC6;font-weight:600;letter-spacing:.32em;}
+#login-code:focus{border-color:var(--turf);box-shadow:0 0 0 3px rgba(11,110,79,.12);}
+#login-code:disabled{opacity:.6;}

@@ -49,19 +49,41 @@ vercel.json          정적 루트(public) / 보안 헤더
 > publishable key는 반대로 브라우저에 노출되는 것이 정상입니다.
 > 실제 보호는 `schema.sql`의 **RLS 정책**이 하므로, 2번을 건너뛰면 안 됩니다.
 
-### 2. 로그인(매직링크) 설정
+### 2. 로그인(6자리 코드) 설정
 
 **Authentication → Sign In / Providers → Email** 이 켜져 있는지 확인합니다. (기본값으로 켜져 있음)
 
-**Authentication → URL Configuration**
+#### 메일 템플릿을 코드 방식으로 — 이걸 안 하면 로그인이 아예 안 됩니다
+
+**Authentication → Emails → Magic Link** 템플릿을 엽니다.
+기본 템플릿은 링크(`{{ .ConfirmationURL }}`)를 보내는데, 앱은 6자리 코드를 입력받으므로
+`{{ .Token }}` 을 쓰도록 바꿔야 합니다.
+
+```html
+<h2>골프 스윙 기록 로그인</h2>
+<p>아래 6자리 코드를 앱에 입력해 주세요.</p>
+<p style="font-size:30px;font-weight:700;letter-spacing:6px;">{{ .Token }}</p>
+<p>코드는 1시간 동안 쓸 수 있어요. 요청한 적이 없다면 이 메일은 무시하세요.</p>
+```
+
+> **왜 링크가 아니라 코드인가**
+>
+> 링크 방식은 휴대폰에서 무한 반복에 빠집니다. Chrome에서 로그인을 시작해도
+> 메일 앱에서 링크를 누르면 **메일 앱의 내장 브라우저**가 열리고 세션이 거기에 생깁니다.
+> Chrome은 여전히 로그아웃 상태라 또 메일을 보내게 되죠.
+>
+> 코드는 눈으로 읽어 옮기므로 브라우저를 건너뛸 일이 없습니다.
+> 앱이 `signInWithOtp`에 `emailRedirectTo`를 넘기지 않는 것도 같은 이유입니다
+> (넘기면 Supabase가 코드 대신 링크를 보냅니다).
+
+#### URL Configuration (선택)
+
+코드 방식에서는 리다이렉트를 쓰지 않아 필수는 아닙니다.
+다만 Site URL은 비워 두지 않는 편이 좋습니다.
 
 | 항목 | 값 |
 |---|---|
 | Site URL | `https://<프로젝트>.vercel.app` |
-| Redirect URLs | `https://<프로젝트>.vercel.app/**` 와 `http://localhost:3000/**` |
-
-Vercel 주소는 3~4단계에서 정해지므로, 배포한 뒤에 돌아와서 채워도 됩니다.
-**여기를 안 채우면 메일 링크를 눌러도 로그인이 되지 않습니다.**
 
 ### 3. GitHub에 올리기
 
@@ -119,7 +141,7 @@ export default {
 
 | 증상 | 원인 |
 |---|---|
-| 메일 링크를 눌러도 로그인 화면 그대로 | Supabase **Redirect URLs**에 배포 주소가 없음 (2단계) |
+| 메일에 코드가 아니라 링크가 옴 | Magic Link 템플릿이 아직 `{{ .ConfirmationURL }}` 임. `{{ .Token }}` 으로 바꾸세요 (2단계) |
 | `swings 테이블이 없습니다` | `supabase/schema.sql`을 아직 실행하지 않음 |
 | `권한이 없습니다` | RLS 정책이 빠짐 → `schema.sql`을 다시 Run |
 | `SUPABASE_URL이 설정되지 않았습니다` | Vercel 환경변수 누락. 추가한 뒤 **재배포**해야 반영됩니다 |

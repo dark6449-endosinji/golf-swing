@@ -1,5 +1,5 @@
 import {
-  initStore, onAuthChange, currentUser, sendMagicLink, signOut,
+  initStore, onAuthChange, currentUser, sendLoginCode, verifyLoginCode, signOut,
   fetchRecords, addRecord, removeRecord, removeAllRecords,
 } from './store.js';
 
@@ -12,6 +12,7 @@ var state = { view:'calendar', y:0, m:0, selectedDate:null, selectedClub:null, l
 var sheetState = null;
 var saving = false;        // 저장 중 중복 실행 막기 (버튼 연타 / 음성 중복 인식)
 var enteredFor = null;     // 이미 진입한 사용자 id (auth 이벤트 중복 방지)
+var pendingEmail = '';     // 코드 입력 화면에서 확인 대상이 되는 주소
 
 /* ---------- helpers ---------- */
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){
@@ -666,7 +667,9 @@ document.addEventListener('click', function(e){
 
 /* 로그인 폼은 Enter 키로도 보낼 수 있게 submit을 받습니다. */
 document.addEventListener('submit', function(e){
-  if(e.target && e.target.id==='login-form'){ e.preventDefault(); requestMagicLink(); }
+  if(!e.target) return;
+  if(e.target.id==='login-form'){ e.preventDefault(); requestLoginCode(); }
+  else if(e.target.id==='code-form'){ e.preventDefault(); submitLoginCode(); }
 });
 
 /* ---------- 로그인 게이트 ----------
@@ -694,11 +697,11 @@ function showLogin(email, msg, kind){
     '<div class="gate-emo">⛳</div>'+
     '<div class="eyebrow">SWING LOG</div>'+
     '<h1>골프 스윙 기록</h1>'+
-    '<p class="gate-lead">이메일 주소만 넣으면 로그인 링크를 보내드려요. 비밀번호는 없습니다.</p>'+
+    '<p class="gate-lead">이메일 주소를 넣으면 6자리 로그인 코드를 보내드려요. 비밀번호는 없습니다.</p>'+
     '<form id="login-form" novalidate>'+
       '<input id="login-email" type="email" inputmode="email" autocomplete="email" '+
         'placeholder="you@example.com" value="'+esc(email||'')+'">'+
-      '<button class="save" type="submit" id="login-btn">로그인 링크 받기</button>'+
+      '<button class="save" type="submit" id="login-btn">로그인 코드 받기</button>'+
     '</form>'+
     (msg?'<p class="data-msg '+(kind||'err')+'">'+esc(msg)+'</p>':'')+
     '<p class="gate-note">한 번 로그인하면 이 브라우저에서는 계속 유지돼요. 기록은 계정에 저장돼서 휴대폰에서 적은 게 PC에서도 그대로 보입니다.</p>'
@@ -708,15 +711,31 @@ function showLogin(email, msg, kind){
   var el=document.getElementById('login-email');
   if(el && !el.value) el.focus();
 }
-function showLinkSent(email){
+function showCodeEntry(email, msg){
   showGate(
     '<div class="gate-emo">📬</div>'+
-    '<h1>메일을 확인해 주세요</h1>'+
-    '<p class="gate-lead"><strong>'+esc(email)+'</strong> 으로 로그인 링크를 보냈어요.<br>'+
-      '메일 속 링크를 누르면 바로 로그인됩니다.</p>'+
-    '<button class="btn-ghost" style="width:100%;" data-action="backToLogin">다른 주소로 다시 보내기</button>'+
-    '<p class="gate-note">메일이 안 보이면 스팸함도 확인해 주세요.</p>'
+    '<h1>코드를 입력해 주세요</h1>'+
+    '<p class="gate-lead"><strong>'+esc(email)+'</strong> 으로 6자리 코드를 보냈어요.<br>'+
+      '메일에 적힌 숫자를 그대로 옮겨 적으면 됩니다.</p>'+
+    '<form id="code-form" novalidate>'+
+      '<input id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" '+
+        'maxlength="6" placeholder="000000">'+
+      '<button class="save" type="submit" id="code-btn">로그인</button>'+
+    '</form>'+
+    (msg?'<p class="data-msg err">'+esc(msg)+'</p>':'')+
+    '<button class="btn-ghost" style="width:100%;margin-top:10px;" data-action="backToLogin">다른 주소로 받기</button>'+
+    '<p class="gate-note">메일이 안 보이면 스팸함도 확인해 주세요. 코드는 한 시간 안에 입력해야 합니다.</p>'
   );
+  var el=document.getElementById('login-code');
+  if(el){
+    el.focus();
+    // 숫자만 남기고, 6자리가 채워지면 바로 확인합니다 (붙여넣기 한 번으로 끝).
+    el.addEventListener('input', function(){
+      var v=el.value.replace(/\D/g,'').slice(0,6);
+      if(v!==el.value) el.value=v;
+      if(v.length===6) submitLoginCode();
+    });
+  }
 }
 function showGateError(msg){
   showGate(
@@ -727,7 +746,7 @@ function showGateError(msg){
   );
 }
 
-async function requestMagicLink(){
+async function requestLoginCode(){
   var inp=document.getElementById('login-email'), btn=document.getElementById('login-btn');
   var email=inp?inp.value.trim():'';
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
@@ -735,11 +754,26 @@ async function requestMagicLink(){
   }
   if(btn){ btn.disabled=true; btn.textContent='보내는 중…'; }
   try{
-    await sendMagicLink(email);
+    await sendLoginCode(email);
     rememberEmail(email);
-    showLinkSent(email);
+    pendingEmail=email;
+    showCodeEntry(email);
   }catch(e){
     showLogin(email, errMsg(e), 'err');
+  }
+}
+
+async function submitLoginCode(){
+  var inp=document.getElementById('login-code'), btn=document.getElementById('code-btn');
+  var code=(inp?inp.value:'').replace(/\D/g,'');
+  if(code.length!==6){ showCodeEntry(pendingEmail,'숫자 6자리를 입력해 주세요.'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='확인 중…'; }
+  if(inp) inp.disabled=true;
+  try{
+    await verifyLoginCode(pendingEmail, code);
+    await enterApp();
+  }catch(e){
+    showCodeEntry(pendingEmail, errMsg(e));
   }
 }
 
