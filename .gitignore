@@ -1,0 +1,21 @@
+node_modules/
+.vercel/
+.netlify/
+
+# 환경변수 (Supabase 키는 Vercel 대시보드에만 넣습니다)
+.env
+.env.local
+.env*.local
+
+# 로컬 개발용 Supabase 설정
+public/js/config.local.js
+
+# 다른 프로젝트 (golf와 무관 — 따로 옮기는 게 좋습니다)
+AX/
+
+# 카카오톡에서 받은 사진. 공개 저장소에 올라가지 않도록 기본 제외해 두었습니다.
+# 저장소에 함께 두고 싶으면 이 두 줄을 지우세요.
+KakaoTalk_*.jpg
+
+.DS_Store
+Thumbs.db

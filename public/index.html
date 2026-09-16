@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B6E4F">
+<meta name="description" content="볼스피드·헤드스피드·거리로 스매시팩터를 계산해 날짜와 클럽별로 모아보는 골프 연습 기록장">
+<title>골프 스윙 기록</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<!-- 로그인 전에는 이 화면만 보입니다 -->
+<div id="gate" class="gate">
+  <div class="gate-box">
+    <div class="gate-emo">⛳</div>
+    <p class="gate-busy">불러오는 중…</p>
+  </div>
+</div>
+
+<div class="app hidden">
+  <header id="topbar"></header>
+  <main id="view"></main>
+</div>
+
+<button id="pill" class="pill hidden" data-action="add">＋ 기록 추가</button>
+<div id="overlay" class="overlay hidden"></div>
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

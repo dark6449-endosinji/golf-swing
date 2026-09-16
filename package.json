@@ -1,0 +1,12 @@
+{
+  "name": "golf-swing-log",
+  "version": "2.0.0",
+  "private": true,
+  "description": "골프 스윙 기록 — 볼스피드·헤드스피드·거리로 스매시팩터를 계산하고 날짜·클럽별로 모아보는 연습 기록장",
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes vercel dev",
+    "deploy": "npx --yes vercel --prod"
+  },
+  "license": "ISC"
+}
